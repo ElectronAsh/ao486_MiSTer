@@ -19,10 +19,16 @@
 //
 //============================================================================
 
+`define PCI_ADAPTER
+
 `ifndef ARCADE_SYS
 	`define USE_DDRAM
-	`define USE_SDRAM
+	
+	`ifndef PCI_ADAPTER
+		`define USE_SDRAM
+	`endif
 `endif
+
 
 `ifndef USE_DDRAM
 	`ifdef USE_FB
@@ -55,6 +61,15 @@ module sys_top
 	
 	input         HDMI_TX_INT,
 
+// GPIO_0
+`ifdef PCI_ADAPTER
+	inout [31:0] PCI_AD,				// Upper 16 bits are on GPIO_1! Lower 16 bits are on GPIO_0.
+	inout [3:0] PCI_CBE,				// Upper 2 bits are on GPIO_1! Lower 2 bits are on GPIO_0.
+	inout PCI_PAR,
+	inout PCI_GNT_N,
+	inout PCI_SERR_N,
+	inout PCI_SBO_N,
+`else
 	//////////// SDR ///////////
 	output [12:0] SDRAM_A,
 	inout  [15:0] SDRAM_DQ,
@@ -67,8 +82,39 @@ module sys_top
 	output  [1:0] SDRAM_BA,
 	output        SDRAM_CLK,
 	output        SDRAM_CKE,
+`endif
+	
 
-`ifdef DUAL_SDRAM
+// GPIO_1
+`ifdef PCI_ADAPTER
+//	inout [31:16] PCI_AD,			// Upper 16 bits.
+	
+//	inout [3:2] PCI_CBE ,			// Upper two bits.
+	
+	inout			PCI_IDSEL,
+
+	inout			PCI_SDONE,			// ignored atm.	
+	inout			PCI_PERR_N,			// Pulled high atm. Todo - add a pull-up to the adapter board.
+	inout			PCI_LOCK_N,			// ignored atm.
+
+	inout			PCI_STOP_N,
+	inout			PCI_DEVSEL_N,
+	inout			PCI_TRDY_N,
+	inout			PCI_IRDY_N,
+	inout			PCI_FRAME_N,
+	inout			PCI_REQ_N,
+	
+	output		PCI_CLK,
+	output		PCI_RST_N,
+	
+	input			PCI_PRSNT1_N,		// ignored atm.
+	input			PCI_PRSNT2_N,		// ignored atm.
+	
+	input			PCI_INTA_N,			// Signal routed to pci_irq_out, but not hooked up to ao486 yet. Will use ao486 IRQ11. ElectronAsh.
+	input			PCI_INTB_N,			// ignored atm.
+	input			PCI_INTC_N,			// ignored atm.
+	input			PCI_INTD_N,			// ignored atm.
+`elsif DUAL_SDRAM
 	////////// SDR #2 //////////
 	output [12:0] SDRAM2_A,
 	inout  [15:0] SDRAM2_DQ,
@@ -78,7 +124,6 @@ module sys_top
 	output        SDRAM2_nCS,
 	output  [1:0] SDRAM2_BA,
 	output        SDRAM2_CLK,
-
 `else
 	//////////// VGA ///////////
 	output  [5:0] VGA_R,
@@ -107,16 +152,6 @@ module sys_top
 	input         BTN_RESET,
 `endif
 
-	////////// I/O ALT /////////
-	output        SD_SPI_CS,
-	input         SD_SPI_MISO,
-	output        SD_SPI_CLK,
-	output        SD_SPI_MOSI,
-
-	inout         SDCD_SPDIF,
-	output        IO_SCL,
-	inout         IO_SDA,
-
 	////////// ADC //////////////
 	output        ADC_SCK,
 	input         ADC_SDO,
@@ -132,38 +167,68 @@ module sys_top
 	////////// MB LED ///////////
 	output  [7:0] LED,
 
+	////////// I/O ALT /////////
+	output        SD_SPI_CS,		// Use for PCI on future rev?
+	input         SD_SPI_MISO,		// Use for PCI on future rev?
+	output        SD_SPI_CLK,		// Use for PCI on future rev?
+	output        SD_SPI_MOSI,		// Use for PCI on future rev?
+	inout         SDCD_SPDIF,		// Use for PCI on future rev?
+	output        IO_SCL,			// Use for PCI on future rev?
+	inout         IO_SDA,			// Use for PCI on future rev?
+	
 	///////// USER IO ///////////
-	inout   [6:0] USER_IO
+	inout   [6:0] USER_IO			// Use for PCI on future rev?
 );
+
+/*
+SD_SPI_CS   = Arduino_IO9
+SD_SPI_MISO = Arduino_IO7
+SD_SPI_CLK  = Arduino_IO6
+SD_SPI_MOSI = Arduino_IO5
+SDCD_SPDIF  = Arduino_Reset_n (has a 10K pullup to 3V3 on the DE10 Nano).
+IO_SCL      = Arduino_IO4
+IO_SDA      = Arduino_IO3
+USER_IO[6]  = Arduino_IO8
+USER_IO[5]  = Arduino_IO10
+USER_IO[4]  = Arduino_IO11
+USER_IO[3]  = Arduino_IO12
+USER_IO[2]  = Arduino_IO13
+USER_IO[1]  = Arduino_IO14
+USER_IO[0]  = Arduino_IO15
+*/
 
 //////////////////////  Secondary SD  ///////////////////////////////////
 wire SD_CS, SD_CLK, SD_MOSI;
 
-`ifdef ARCADE_SYS
-	assign SD_CS   = 1'bZ;
-	assign SD_CLK  = 1'bZ;
-	assign SD_MOSI = 1'bZ;
+`ifdef PCI_ADAPTER
+	// PCI Overrides all the stuff below!
 `else
-	`ifndef DUAL_SDRAM
-		wire sd_miso = SW[3] | SDIO_DAT[0];
-	`else
-		wire sd_miso = 1;
+	`ifdef ARCADE_SYS
+		assign SD_CS   = 1'bZ;
+		assign SD_CLK  = 1'bZ;
+		assign SD_MOSI = 1'bZ;
+
+		`ifndef DUAL_SDRAM
+			wire sd_miso = SW[3] | SDIO_DAT[0];
+		`else
+			wire sd_miso = 1;
+		`endif
+		wire SD_MISO = mcp_sdcd ? sd_miso : SD_SPI_MISO;
 	`endif
-	wire SD_MISO = mcp_sdcd ? sd_miso : SD_SPI_MISO;
-`endif
 
-`ifndef DUAL_SDRAM
-	assign SDIO_DAT[2:1]= 2'bZZ;
-	assign SDIO_DAT[3]  = SW[3] ? 1'bZ  : SD_CS;
-	assign SDIO_CLK     = SW[3] ? 1'bZ  : SD_CLK;
-	assign SDIO_CMD     = SW[3] ? 1'bZ  : SD_MOSI;
-	assign SD_SPI_CS    = mcp_sdcd ? ((~VGA_EN & sog & ~cs1) ? 1'b1 : 1'bZ) : SD_CS;
-`else
-	assign SD_SPI_CS    = mcp_sdcd ? 1'bZ : SD_CS;
-`endif
+	`ifndef DUAL_SDRAM
+		assign SDIO_DAT[2:1]= 2'bZZ;
+		assign SDIO_DAT[3]  = SW[3] ? 1'bZ  : SD_CS;
+		assign SDIO_CLK     = SW[3] ? 1'bZ  : SD_CLK;
+		assign SDIO_CMD     = SW[3] ? 1'bZ  : SD_MOSI;
+		assign SD_SPI_CS    = mcp_sdcd ? ((~VGA_EN & sog & ~cs1) ? 1'b1 : 1'bZ) : SD_CS;
+	`else
+		assign SD_SPI_CS    = mcp_sdcd ? 1'bZ : SD_CS;
+	`endif
 
-assign SD_SPI_CLK  = mcp_sdcd ? 1'bZ : SD_CLK;
-assign SD_SPI_MOSI = mcp_sdcd ? 1'bZ : SD_MOSI;
+	assign SD_SPI_CLK  = mcp_sdcd ? 1'bZ : SD_CLK;
+	assign SD_SPI_MOSI = mcp_sdcd ? 1'bZ : SD_MOSI;
+`endif
 
 //////////////////////  LEDs/Buttons  ///////////////////////////////////
 
@@ -185,10 +250,15 @@ wire led_locked;
 assign LED = (led_overtake & led_state) | (~led_overtake & {1'b0,led_locked,1'b0, ~led_p, 1'b0, ~led_d, 1'b0, ~led_u});
 
 wire btn_r, btn_o, btn_u;
-`ifdef DUAL_SDRAM
-	assign {btn_r,btn_o,btn_u} = {mcp_btn[1],mcp_btn[2],mcp_btn[0]};
+
+`ifdef PCI_ADAPTER
+	// PCI Overrides all the stuff below!
 `else
-	assign {btn_r,btn_o,btn_u} = ~{BTN_RESET,BTN_OSD,BTN_USER} | {mcp_btn[1],mcp_btn[2],mcp_btn[0]};
+	`ifdef DUAL_SDRAM
+		assign {btn_r,btn_o,btn_u} = {mcp_btn[1],mcp_btn[2],mcp_btn[0]};
+	`else
+		assign {btn_r,btn_o,btn_u} = ~{BTN_RESET,BTN_OSD,BTN_USER} | {mcp_btn[1],mcp_btn[2],mcp_btn[0]};
+	`endif
 `endif
 
 wire [2:0] mcp_btn;
@@ -1173,6 +1243,10 @@ osd vga_osd
 wire vga_cs_osd;
 csync csync_vga(clk_vid, vga_hs_osd, vga_vs_osd, vga_cs_osd);
 
+`ifdef PCI_ADAPTER
+	// PCI Overrides all the stuff below!
+`else
+
 `ifndef DUAL_SDRAM
 	wire [23:0] vga_o;
 	vga_out vga_out
@@ -1192,6 +1266,8 @@ csync csync_vga(clk_vid, vga_hs_osd, vga_vs_osd, vga_cs_osd);
 	assign VGA_R  = (VGA_EN | SW[3]) ? 6'bZZZZZZ : vga_o[23:18];
 	assign VGA_G  = (VGA_EN | SW[3]) ? 6'bZZZZZZ : vga_o[15:10];
 	assign VGA_B  = (VGA_EN | SW[3]) ? 6'bZZZZZZ : vga_o[7:2];
+`endif
+
 `endif
 
 reg video_sync = 0;
@@ -1522,8 +1598,36 @@ emu emu
 `endif
 
 	.USER_OUT(user_out),
-	.USER_IN(user_in)
+	.USER_IN(user_in),
+	
+`ifdef PCI_ADAPTER
+	.PCI_AD(PCI_AD) ,					// inout [31:0] PCI_AD
+	.PCI_CBE(PCI_CBE) ,				// inout [3:0] PCI_CBE
+	.PCI_PAR(PCI_PAR) ,				// inout  PCI_PAR
+	.PCI_IDSEL(PCI_IDSEL) ,			// inout  PCI_IDSEL
+	.PCI_GNT_N(PCI_GNT_N) ,			// inout  PCI_GNT_N
+	.PCI_SERR_N(PCI_SERR_N) ,		// inout  PCI_SERR_N
+	.PCI_SBO_N(PCI_SBO_N) ,			// inout  PCI_SBO_N
+	.PCI_SDONE(PCI_SDONE) ,			// inout  PCI_SDONE
+	.PCI_PERR_N(PCI_PERR_N) ,		// inout  PCI_PERR_N
+	.PCI_LOCK_N(PCI_LOCK_N) ,		// inout  PCI_LOCK_N
+	.PCI_STOP_N(PCI_STOP_N) ,		// inout  PCI_STOP_N
+	.PCI_DEVSEL_N(PCI_DEVSEL_N) ,	// inout  PCI_DEVSEL_N
+	.PCI_TRDY_N(PCI_TRDY_N) ,		// inout  PCI_TRDY_N
+	.PCI_IRDY_N(PCI_IRDY_N) ,		// inout  PCI_IRDY_N
+	.PCI_FRAME_N(PCI_FRAME_N) ,	// inout  PCI_FRAME_N
+	.PCI_REQ_N(PCI_REQ_N) ,			// inout  PCI_REQ_N
+	.PCI_CLK(PCI_CLK) ,				// inout  PCI_CLK
+	.PCI_RST_N(PCI_RST_N) ,			// inout  PCI_RST_N
+	.PCI_PRSNT1_N(PCI_PRSNT1_N) ,	// input  PCI_PRSNT1_N
+	.PCI_PRSNT2_N(PCI_PRSNT2_N) ,	// input  PCI_PRSNT2_N
+	.PCI_INTA_N(PCI_INTA_N) ,		// input  PCI_INTA_N
+	.PCI_INTB_N(PCI_INTB_N) ,		// input  PCI_INTB_N
+	.PCI_INTC_N(PCI_INTC_N) ,		// input  PCI_INTC_N
+	.PCI_INTD_N(PCI_INTD_N)			// input  PCI_INTD_N
+`endif
 );
+
 
 endmodule
 

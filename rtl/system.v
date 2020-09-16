@@ -90,7 +90,34 @@ module system
 	output        DDRAM_RD,
 	output [63:0] DDRAM_DIN,
 	output  [7:0] DDRAM_BE,
-	output        DDRAM_WE
+	output        DDRAM_WE,
+	
+	inout [31:0] PCI_AD,
+	inout [3:0] PCI_CBE,
+	inout PCI_PAR,
+	inout PCI_IDSEL,
+	inout PCI_GNT_N,
+	inout PCI_SERR_N,
+	inout PCI_SBO_N,
+	inout PCI_SDONE,
+	inout PCI_PERR_N,
+	inout PCI_LOCK_N,
+	inout PCI_STOP_N,
+	inout PCI_DEVSEL_N,
+	inout PCI_TRDY_N,
+	inout PCI_IRDY_N,
+	inout PCI_FRAME_N,
+	inout PCI_REQ_N,
+	
+	output PCI_CLK,
+	output PCI_RST_N,
+	
+	input PCI_PRSNT1_N,
+	input PCI_PRSNT2_N,
+	input PCI_INTA_N,
+	input PCI_INTB_N,
+	input PCI_INTC_N,
+	input PCI_INTD_N
 );
 
 wire        a20_enable;
@@ -131,7 +158,7 @@ wire        interrupt_done;
 wire        interrupt_do;
 wire  [7:0] interrupt_vector;
 reg  [15:0] interrupt;
-wire        irq_0, irq_1, irq_2, irq_4, irq_5, irq_6, irq_7, irq_8, irq_9, irq_10, irq_12, irq_14, irq_15;
+wire        irq_0, irq_1, irq_2, irq_4, irq_5, irq_6, irq_7, irq_8, irq_9, irq_10, irq_11, irq_12, irq_14, irq_15;
 
 wire        cpu_io_read_do;
 wire [15:0] cpu_io_read_address;
@@ -170,6 +197,7 @@ reg         vga_b_cs;
 reg         vga_c_cs;
 reg         vga_d_cs;
 reg         sysctl_cs;
+reg         pci_io_cs;
 
 wire  [7:0] sound_readdata;
 wire  [7:0] floppy0_readdata;
@@ -309,6 +337,7 @@ always @(posedge clk_sys) begin
 	vga_b_cs      <= ({iobus_address[15:4], 4'd0} == 16'h03B0);
 	vga_c_cs      <= ({iobus_address[15:4], 4'd0} == 16'h03C0);
 	vga_d_cs      <= ({iobus_address[15:4], 4'd0} == 16'h03D0);
+	pci_io_cs	  <= ({iobus_address[15:0]      } == 16'h0CF8) || (iobus_address == 16'h0CFC);
 	sysctl_cs     <= ({iobus_address[15:0]      } == 16'h8888);
 end
 
@@ -366,7 +395,7 @@ iobus iobus
 	.bus_io32          (((hdd0_cs | hdd1_cs) & ~iobus_address[9]) | sysctl_cs),
 	.bus_datasize      (iobus_datasize),
 	.bus_writedata     (iobus_writedata),
-	.bus_readdata      (hdd0_cs ? hdd0_readdata : hdd1_cs ? hdd1_readdata : iobus_readdata8)
+	.bus_readdata      (hdd0_cs ? hdd0_readdata : hdd1_cs ? hdd1_readdata : pci_io_cs ? pci_io_readdata : iobus_readdata8)
 );
 
 dma dma
@@ -700,6 +729,72 @@ pic pic
 	.interrupt_input   (interrupt)
 );
 
+
+wire pci_io_waitrequest;
+wire pci_io_readdatavalid;
+wire [31:0] pci_io_readdata;
+
+wire pci_mem_waitrequest;
+wire pci_mem_readdatavalid;
+wire [31:0] pci_mem_readdata;
+
+wire pci_irq_out;
+//assign irq_11 = pci_irq_out;
+
+wire pci_mem_cs = 1'b0;	// todo !
+
+pci pci_inst
+(
+	.clk(clk_sys) ,										// input  clk
+	.rst_n(~reset) ,										// input  rst_n
+	
+	.io_address(iobus_address[2]) ,					// input  io_address
+	.io_read(pci_io_cs & iobus_read) ,				// input  io_read
+	.io_readdata(pci_io_readdata) ,					// output [31:0] io_readdata
+	.io_write(pci_io_cs & iobus_write) ,			// input  io_write
+	.io_writedata(iobus_writedata) ,					// input [31:0] io_writedata
+	.io_waitrequest(pci_io_waitrequest) ,			// output  io_waitrequest
+	.io_readdatavalid(pci_io_readdatavalid) ,		// output  io_readdatavalid
+	
+	.avm_address(mem_address) ,						// input [21:0] avm_address
+	.avm_writedata(mem_writedata) ,					// input [31:0] avm_writedata
+	.avm_byteenable(mem_byteenable) ,				// input [3:0] avm_byteenable
+	.avm_burstcount(mem_burstcount) ,				// input [2:0] avm_burstcount
+	.avm_write(pci_mem_cs & mem_write) ,			// input  avm_write
+	.avm_read(pci_mem_cs & mem_read) ,				// input  avm_read
+	.avm_waitrequest(pci_mem_waitrequest) ,		// output  avm_waitrequest
+	.avm_readdatavalid(pci_mem_readdatavalid) ,	// output  avm_readdatavalid
+	.avm_readdata(pci_mem_readdata) ,				// output [31:0] avm_readdata
+	
+	.pci_irq_out(pci_irq_out) ,						// output  pci_irq_out
+	
+	.PCI_AD(PCI_AD) ,					// inout [31:0] PCI_AD
+	.PCI_CBE(PCI_CBE) ,				// inout [3:0] PCI_CBE
+	.PCI_PAR(PCI_PAR) ,				// inout  PCI_PAR
+	.PCI_IDSEL(PCI_IDSEL) ,			// inout  PCI_IDSEL
+	.PCI_GNT_N(PCI_GNT_N) ,			// inout  PCI_GNT_N
+	.PCI_SERR_N(PCI_SERR_N) ,		// inout  PCI_SERR_N
+	.PCI_SBO_N(PCI_SBO_N) ,			// inout  PCI_SBO_N
+	.PCI_SDONE(PCI_SDONE) ,			// inout  PCI_SDONE
+	.PCI_PERR_N(PCI_PERR_N) ,		// inout  PCI_PERR_N
+	.PCI_LOCK_N(PCI_LOCK_N) ,		// inout  PCI_LOCK_N
+	.PCI_STOP_N(PCI_STOP_N) ,		// inout  PCI_STOP_N
+	.PCI_DEVSEL_N(PCI_DEVSEL_N) ,	// inout  PCI_DEVSEL_N
+	.PCI_TRDY_N(PCI_TRDY_N) ,		// inout  PCI_TRDY_N
+	.PCI_IRDY_N(PCI_IRDY_N) ,		// inout  PCI_IRDY_N
+	.PCI_FRAME_N(PCI_FRAME_N) ,	// inout  PCI_FRAME_N
+	.PCI_REQ_N(PCI_REQ_N) ,			// inout  PCI_REQ_N
+	.PCI_CLK(PCI_CLK) ,				// inout  PCI_CLK
+	.PCI_RST_N(PCI_RST_N) ,			// inout  PCI_RST_N
+	.PCI_PRSNT1_N(PCI_PRSNT1_N) ,	// input  PCI_PRSNT1_N
+	.PCI_PRSNT2_N(PCI_PRSNT2_N) ,	// input  PCI_PRSNT2_N
+	.PCI_INTA_N(PCI_INTA_N) ,		// input  PCI_INTA_N
+	.PCI_INTB_N(PCI_INTB_N) ,		// input  PCI_INTB_N
+	.PCI_INTC_N(PCI_INTC_N) ,		// input  PCI_INTC_N
+	.PCI_INTD_N(PCI_INTD_N)			// input  PCI_INTD_N
+);
+
+
 always @* begin
 	interrupt = 0;
 
@@ -712,6 +807,7 @@ always @* begin
 	interrupt[8]  = irq_8;
 	interrupt[9]  = irq_9 | irq_2;
 	interrupt[10] = irq_10;
+	interrupt[11] = irq_11;
 	interrupt[12] = irq_12;
 	interrupt[14] = irq_14;
 	interrupt[15] = irq_15;

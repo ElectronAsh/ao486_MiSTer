@@ -146,7 +146,34 @@ module emu
 	input   [6:0] USER_IN,
 	output  [6:0] USER_OUT,
 
-	input         OSD_STATUS
+	input         OSD_STATUS,
+
+	inout [31:0] PCI_AD,
+	inout [3:0] PCI_CBE,
+	inout PCI_PAR,
+	inout PCI_IDSEL,
+	inout PCI_GNT_N,
+	inout PCI_SERR_N,
+	inout PCI_SBO_N,
+	inout PCI_SDONE,
+	inout PCI_PERR_N,
+	inout PCI_LOCK_N,
+	inout PCI_STOP_N,
+	inout PCI_DEVSEL_N,
+	inout PCI_TRDY_N,
+	inout PCI_IRDY_N,
+	inout PCI_FRAME_N,
+	inout PCI_REQ_N,
+	
+	output PCI_CLK,
+	output PCI_RST_N,
+	
+	input PCI_PRSNT1_N,
+	input PCI_PRSNT2_N,
+	input PCI_INTA_N,
+	input PCI_INTB_N,
+	input PCI_INTC_N,
+	input PCI_INTD_N
 );
 
 //`define DEBUG
@@ -661,7 +688,32 @@ system system
 	.DDRAM_BURSTCNT       (DDRAM_BURSTCNT),
 	.DDRAM_BUSY           (DDRAM_BUSY),
 	.DDRAM_RD             (DDRAM_RD),
-	.DDRAM_WE             (DDRAM_WE)
+	.DDRAM_WE             (DDRAM_WE),
+	
+	.PCI_AD(PCI_AD) ,					// inout [31:0] PCI_AD
+	.PCI_CBE(PCI_CBE) ,				// inout [3:0] PCI_CBE
+	.PCI_PAR(PCI_PAR) ,				// inout  PCI_PAR
+	.PCI_IDSEL(PCI_IDSEL) ,			// inout  PCI_IDSEL
+	.PCI_GNT_N(PCI_GNT_N) ,			// inout  PCI_GNT_N
+	.PCI_SERR_N(PCI_SERR_N) ,		// inout  PCI_SERR_N
+	.PCI_SBO_N(PCI_SBO_N) ,			// inout  PCI_SBO_N
+	.PCI_SDONE(PCI_SDONE) ,			// inout  PCI_SDONE
+	.PCI_PERR_N(PCI_PERR_N) ,		// inout  PCI_PERR_N
+	.PCI_LOCK_N(PCI_LOCK_N) ,		// inout  PCI_LOCK_N
+	.PCI_STOP_N(PCI_STOP_N) ,		// inout  PCI_STOP_N
+	.PCI_DEVSEL_N(PCI_DEVSEL_N) ,	// inout  PCI_DEVSEL_N
+	.PCI_TRDY_N(PCI_TRDY_N) ,		// inout  PCI_TRDY_N
+	.PCI_IRDY_N(PCI_IRDY_N) ,		// inout  PCI_IRDY_N
+	.PCI_FRAME_N(PCI_FRAME_N) ,	// inout  PCI_FRAME_N
+	.PCI_REQ_N(PCI_REQ_N) ,			// inout  PCI_REQ_N
+	.PCI_CLK(PCI_CLK) ,				// inout  PCI_CLK
+	.PCI_RST_N(PCI_RST_N) ,			// inout  PCI_RST_N
+	.PCI_PRSNT1_N(PCI_PRSNT1_N) ,	// input  PCI_PRSNT1_N
+	.PCI_PRSNT2_N(PCI_PRSNT2_N) ,	// input  PCI_PRSNT2_N
+	.PCI_INTA_N(PCI_INTA_N) ,		// input  PCI_INTA_N
+	.PCI_INTB_N(PCI_INTB_N) ,		// input  PCI_INTB_N
+	.PCI_INTC_N(PCI_INTC_N) ,		// input  PCI_INTC_N
+	.PCI_INTD_N(PCI_INTD_N)			// input  PCI_INTD_N
 );
 
 wire [7:0] syscfg;
