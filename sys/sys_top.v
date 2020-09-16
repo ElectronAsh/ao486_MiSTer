@@ -19,7 +19,7 @@
 //
 //============================================================================
 
-`define PCI_ADAPTER
+//`define PCI_ADAPTER
 
 `ifndef ARCADE_SYS
 	`define USE_DDRAM
