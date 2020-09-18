@@ -337,7 +337,7 @@ always @(posedge clk_sys) begin
 	vga_b_cs      <= ({iobus_address[15:4], 4'd0} == 16'h03B0);
 	vga_c_cs      <= ({iobus_address[15:4], 4'd0} == 16'h03C0);
 	vga_d_cs      <= ({iobus_address[15:4], 4'd0} == 16'h03D0);
-	pci_io_cs	  <= ({iobus_address[15:2], 2'd0} == 16'h0CF8) || ({iobus_address[15:2], 2'd0} == 16'h0CFC);
+	pci_io_cs	  <= ({iobus_address[15:0]      } == 16'h0CF8) || (iobus_address == 16'h0CFC);
 	sysctl_cs     <= ({iobus_address[15:0]      } == 16'h8888);
 end
 

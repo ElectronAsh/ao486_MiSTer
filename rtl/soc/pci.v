@@ -29,25 +29,26 @@ module pci (
 	inout [3:0] PCI_CBE,
 	inout			PCI_PAR,
 	
-	inout			PCI_IDSEL,
+	inout			PCI_IDSEL,		// Used to select the PCI Config Regs. Only asserted/seen during the Address phase. Can toggle after that.
 	
-	inout			PCI_GNT_N,		// Pulled high atm. Todo - add a pull-up to the adapter board.
-	inout			PCI_SERR_N,		// Pulled high atm. Todo - add a pull-up to the adapter board.
-	inout			PCI_PERR_N,		// Pulled high atm. Todo - add a pull-up to the adapter board.
+	inout			PCI_REQ_N,		// Ignored atm. Driven by the master, to request use of the bus.
+	inout			PCI_GNT_N,		// Pulled high atm. Todo - add a pull-up to the adapter. Used by the arbiter, to grant bus access.
+	
+	inout			PCI_SERR_N,		// Pulled high atm. Todo - add a pull-up to the adapter. Address/data/special parity error.
+	inout			PCI_PERR_N,		// Pulled high atm. Todo - add a pull-up to the adapter. Parity error, expect Special Cycle.
 	
 	inout			PCI_SBO_N,		// ignored atm.
-	inout			PCI_SDONE,		// ignored atm.
-	inout			PCI_LOCK_N,		// ignored atm.
+	inout			PCI_SDONE,		// ignored atm. 
+	inout			PCI_LOCK_N,		// ignored atm. Used to implement exclusive access on the PCI bus.
+	inout			PCI_STOP_N,		// ignored atm. FROM the target (card), used to abort a transfer.
 	
-	inout			PCI_STOP_N,
-	inout			PCI_DEVSEL_N,
-	inout			PCI_TRDY_N,
-	inout			PCI_IRDY_N,
-	inout			PCI_FRAME_N,
-	inout			PCI_REQ_N,
+	inout			PCI_DEVSEL_N,	// Asserted by the device (card) when it decodes a valid address. (or when it sees IDSEL during the addr phase).
+	inout			PCI_TRDY_N,		// Asserted by the Target (device) when it is able to transfer data.
+	inout			PCI_IRDY_N,		// Asserted by the Initiator (host) when it is able to transfer data.
+	inout			PCI_FRAME_N,	// Asserted by the host to denote the start and end of a PCI transaction. (or for ONE clock cycle for IDSEL).
 	
-	output		PCI_CLK,
-	output		PCI_RST_N,
+	output		PCI_CLK,			// 33 MHz clock to the card.
+	output		PCI_RST_N,		// Reset_n to the card.
 	
 	input			PCI_PRSNT1_N,	// ignored atm.
 	input			PCI_PRSNT2_N,	// ignored atm.
@@ -59,9 +60,6 @@ module pci (
 	
 	output      pci_io_running
 );
-
-//assign io_readdata = PCI_AD;
-//assign avm_readdata = PCI_AD;
 
 assign io_readdata = readdata;
 assign avm_readdata = readdata;
@@ -218,9 +216,6 @@ assign PCI_PAR     = (CONT_OE) ? PAR_OUT : 1'bz;
 reg PCI_IRDY_N_REG;
 assign PCI_IRDY_N  = PCI_IRDY_N_REG;
 
-reg PCI_STOP_N_OUT;
-assign PCI_STOP_N = PCI_STOP_N_OUT;
-
 assign PCI_PERR_N  = 1'b1;
 assign PCI_SERR_N  = 1'b1;
 assign PCI_REQ_N   = 1'b1;
@@ -258,8 +253,6 @@ if (!rst_n) begin
 	
 	PCI_IRDY_N_REG <= 1'b1;
 	
-	PCI_STOP_N_OUT <= 1'b1;
-	
 	PCI_STATE <= 8'd0;
 	
 	io_waitrequest <= 1'b1;
@@ -292,7 +285,6 @@ else begin
 			AD_OE <= 1'b0;
 			CONT_OE <= 1'b0;
 			PCI_IRDY_N_REG <= 1'b1;
-			PCI_STOP_N_OUT <= 1'b1;
 			
 			timeout <= 4'd15;
 		
@@ -367,7 +359,6 @@ else begin
 				if (io_access) io_readdatavalid <= 1'b1;
 				else avm_readdatavalid <= 1'b1;
 				PCI_IRDY_N_REG <= 1'b1;		// De-assert IRDY_N.
-				PCI_STOP_N_OUT <= 1'b0;
 				io_waitrequest <= 1'b0;		// To handle cases where io_read is held HIGH before state 0.
 				avm_waitrequest <= 1'b0;	// To handle cases where avm_read is held HIGH before state 0.
 				PCI_STATE <= 0;
@@ -393,7 +384,6 @@ else begin
 			AD_OE <= 1'b0;
 			CONT_OE <= 1'b0;
 			PCI_IRDY_N_REG <= 1'b1;			// De-assert IRDY_N.
-			PCI_STOP_N_OUT <= 1'b0;
 			io_waitrequest <= 1'b0;			// To handle cases where io_write is held HIGH before state 0.
 			avm_waitrequest <= 1'b0;		// To handle cases where avm_write is held HIGH before state 0.
 			PCI_STATE <= 0;
