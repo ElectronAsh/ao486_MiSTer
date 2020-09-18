@@ -21,19 +21,24 @@ module iobus
 	input             bus_io32,
 	output reg  [2:0] bus_datasize,
 	output reg [31:0] bus_writedata,
-	input      [31:0] bus_readdata
+	input      [31:0] bus_readdata,
+	
+	input             io_wait
 );
 
-localparam S_IDLE      = 0;
-localparam S_WRITE     = 1;
-localparam S_WRITE_CHK = 2;
-localparam S_READ      = 3;
-localparam S_READ_W    = 4;
-localparam S_READ_CHK  = 5;
+localparam S_IDLE       = 0;
+localparam S_WRITE      = 1;
+localparam S_WRITE_CHK  = 2;
+localparam S_WRITE_WAIT = 3;
+
+localparam S_READ      = 4;
+localparam S_READ_W    = 5;
+localparam S_READ_CHK  = 6;
+localparam S_READ_WAIT = 7;
 
 always @(posedge clk) begin
-	reg [2:0] state;
-	reg [1:0] cnt;
+	(*noprune*) reg [2:0] state;
+	(*noprune*) reg [1:0] cnt;
 
 	cpu_read_done <= 0;
 	cpu_write_done <= 0;
@@ -64,7 +69,16 @@ always @(posedge clk) begin
 				bus_writedata <= bus_writedata >> 8;
 				bus_datasize  <= bus_datasize - 1'd1;
 				state <= S_WRITE;
-				if(bus_datasize == 1 || bus_io32) begin
+				if (io_wait) state <= S_WRITE_WAIT;
+				else if(bus_datasize == 1 || bus_io32) begin
+					cpu_write_done <= 1;
+					state <= S_IDLE;
+				end
+			end
+			
+		S_WRITE_WAIT:
+			begin
+				if (!io_wait) begin
 					cpu_write_done <= 1;
 					state <= S_IDLE;
 				end
@@ -89,7 +103,17 @@ always @(posedge clk) begin
 
 				if(bus_io32) cpu_read_data <= bus_readdata;
 
-				if(bus_datasize == 1 || bus_io32) begin
+				if (io_wait) state <= S_READ_WAIT;
+				else if(bus_datasize == 1 || bus_io32) begin
+					cpu_read_done <= 1;
+					state <= S_IDLE;
+				end
+			end
+			
+		S_READ_WAIT:
+			begin
+				if (!io_wait) begin
+					cpu_read_data <= bus_readdata;
 					cpu_read_done <= 1;
 					state <= S_IDLE;
 				end

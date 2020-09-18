@@ -392,10 +392,12 @@ iobus iobus
 	.bus_address       (iobus_address),
 	.bus_write         (iobus_write),
 	.bus_read          (iobus_read),
-	.bus_io32          (((hdd0_cs | hdd1_cs) & ~iobus_address[9]) | sysctl_cs | pci_io_running),
+	.bus_io32          (((hdd0_cs | hdd1_cs) & ~iobus_address[9]) | sysctl_cs | pci_io_waitrequest),
 	.bus_datasize      (iobus_datasize),
 	.bus_writedata     (iobus_writedata),
-	.bus_readdata      (hdd0_cs ? hdd0_readdata : hdd1_cs ? hdd1_readdata : pci_io_running ? pci_io_readdata : iobus_readdata8)
+	.bus_readdata      (hdd0_cs ? hdd0_readdata : hdd1_cs ? hdd1_readdata : pci_io_readdatavalid ? pci_io_readdata : iobus_readdata8),
+	
+	.io_wait           (pci_io_waitrequest)
 );
 
 dma dma
@@ -743,8 +745,6 @@ wire pci_irq_out;
 
 wire pci_mem_cs = 1'b0;	// todo !
 
-wire pci_io_running;
-
 pci pci
 (
 	.clk(clk_sys) ,										// input  clk
@@ -757,8 +757,6 @@ pci pci
 	.io_writedata(iobus_writedata) ,					// input [31:0] io_writedata
 	.io_waitrequest(pci_io_waitrequest) ,			// output  io_waitrequest
 	.io_readdatavalid(pci_io_readdatavalid) ,		// output  io_readdatavalid
-	
-	.pci_io_running(pci_io_running) ,				// output  pci_io_running
 	
 	.avm_address(mem_address) ,						// input [21:0] avm_address
 	.avm_writedata(mem_writedata) ,					// input [31:0] avm_writedata
