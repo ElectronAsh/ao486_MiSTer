@@ -19,7 +19,7 @@
 //
 //============================================================================
 
-//`define PCI_ADAPTER
+`define PCI_ADAPTER
 
 `ifndef ARCADE_SYS
 	`define USE_DDRAM
@@ -83,7 +83,7 @@ module sys_top
 	output        SDRAM_CLK,
 	output        SDRAM_CKE,
 `endif
-	
+
 
 // GPIO_1
 `ifdef PCI_ADAPTER
@@ -253,6 +253,7 @@ wire btn_r, btn_o, btn_u;
 
 `ifdef PCI_ADAPTER
 	// PCI Overrides all the stuff below!
+	assign {btn_r,btn_o,btn_u} = 4'b0000;
 `else
 	`ifdef DUAL_SDRAM
 		assign {btn_r,btn_o,btn_u} = {mcp_btn[1],mcp_btn[2],mcp_btn[0]};

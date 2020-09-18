@@ -337,7 +337,7 @@ always @(posedge clk_sys) begin
 	vga_b_cs      <= ({iobus_address[15:4], 4'd0} == 16'h03B0);
 	vga_c_cs      <= ({iobus_address[15:4], 4'd0} == 16'h03C0);
 	vga_d_cs      <= ({iobus_address[15:4], 4'd0} == 16'h03D0);
-	pci_io_cs	  <= ({iobus_address[15:0]      } == 16'h0CF8) || (iobus_address == 16'h0CFC);
+	pci_io_cs	  <= ({iobus_address[15:2], 2'd0} == 16'h0CF8) || ({iobus_address[15:2], 2'd0} == 16'h0CFC);
 	sysctl_cs     <= ({iobus_address[15:0]      } == 16'h8888);
 end
 
@@ -392,10 +392,10 @@ iobus iobus
 	.bus_address       (iobus_address),
 	.bus_write         (iobus_write),
 	.bus_read          (iobus_read),
-	.bus_io32          (((hdd0_cs | hdd1_cs) & ~iobus_address[9]) | sysctl_cs),
+	.bus_io32          (((hdd0_cs | hdd1_cs) & ~iobus_address[9]) | sysctl_cs | pci_io_running),
 	.bus_datasize      (iobus_datasize),
 	.bus_writedata     (iobus_writedata),
-	.bus_readdata      (hdd0_cs ? hdd0_readdata : hdd1_cs ? hdd1_readdata : pci_io_cs ? pci_io_readdata : iobus_readdata8)
+	.bus_readdata      (hdd0_cs ? hdd0_readdata : hdd1_cs ? hdd1_readdata : pci_io_running ? pci_io_readdata : iobus_readdata8)
 );
 
 dma dma
@@ -743,7 +743,9 @@ wire pci_irq_out;
 
 wire pci_mem_cs = 1'b0;	// todo !
 
-pci pci_inst
+wire pci_io_running;
+
+pci pci
 (
 	.clk(clk_sys) ,										// input  clk
 	.rst_n(~reset) ,										// input  rst_n
@@ -755,6 +757,8 @@ pci pci_inst
 	.io_writedata(iobus_writedata) ,					// input [31:0] io_writedata
 	.io_waitrequest(pci_io_waitrequest) ,			// output  io_waitrequest
 	.io_readdatavalid(pci_io_readdatavalid) ,		// output  io_readdatavalid
+	
+	.pci_io_running(pci_io_running) ,				// output  pci_io_running
 	
 	.avm_address(mem_address) ,						// input [21:0] avm_address
 	.avm_writedata(mem_writedata) ,					// input [31:0] avm_writedata

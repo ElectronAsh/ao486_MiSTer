@@ -140,6 +140,7 @@ wire opl_we = (           address[2:1] == 0 && sb_write)  //220-221,228-229
            || (             address[1] == 0 && fm_write)  //388-389
            || (fm_mode &&   address[1] == 1 && fm_write); //38A-38B
 
+/*
 opl3 #(50000000) opl
 (
 	.clk(clk),
@@ -157,6 +158,7 @@ opl3 #(50000000) opl
 	.sample_l(sample_from_opl_l),
 	.sample_r(sample_from_opl_r)
 );
+*/
 
 //------------------------------------------------------------------------------ c/ms
 

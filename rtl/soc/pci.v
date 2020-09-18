@@ -55,13 +55,21 @@ module pci (
 	input			PCI_INTA_N,		// Signal routed to pci_irq_out, but not hooked up to ao486 just yet. Will use ao486 IRQ11 for this. ElectronAsh.
 	input			PCI_INTB_N,		// ignored atm.
 	input			PCI_INTC_N,		// ignored atm.
-	input			PCI_INTD_N		// ignored atm.
+	input			PCI_INTD_N,		// ignored atm.
+	
+	output      pci_io_running
 );
 
-assign io_readdata = PCI_AD;
-assign avm_readdata = PCI_AD;
+//assign io_readdata = PCI_AD;
+//assign avm_readdata = PCI_AD;
+
+assign io_readdata = readdata;
+assign avm_readdata = readdata;
+
 
 assign pci_irq_out = !PCI_INTA_N;
+
+assign pci_io_running = io_access && PCI_STATE>0;
 
 /*
 localparam vendor_id 	= 16'h121A;	// 3Dfx Interactive, Inc.
@@ -233,6 +241,10 @@ assign PCI_GNT_N   = 1'b1;
 
 (*noprune*) reg io_access;
 
+(*noprune*) reg [31:0] readdata;
+
+(*noprune*) reg [3:0] timeout;
+
 always @(posedge clk or negedge rst_n)
 if (!rst_n) begin
 	CONT_OE <= 1'b0;
@@ -281,6 +293,8 @@ else begin
 			CONT_OE <= 1'b0;
 			PCI_IRDY_N_REG <= 1'b1;
 			PCI_STOP_N_OUT <= 1'b1;
+			
+			timeout <= 4'd15;
 		
 			if (avm_read) begin				// MEMIO READ.
 				io_access <= 1'b0;
@@ -295,14 +309,16 @@ else begin
 			end
 			else if (io_read) begin			// IO (PCI Config Space) READ.
 				io_access <= 1'b1;
-				IDSEL_OUT <= 1'b1;
-				CBE_OUT <= CMD_CFGR;
-				AD_OUT <= pci_config_addr;	// Target pci_config_addr.
-				FRAME_N_OUT	<= 1'b0;			// Assert FRAME_N.
-				CONT_OE <= 1'b1;				// Assert PAR and CBE onto the bus.
-				AD_OE <= 1'b1;					// Allow AD_OUT assert on bus.
-				io_waitrequest <= 1'b1;
-				PCI_STATE <= 1;
+				if (bus==8'd0 && device==5'd1) begin		// Allow reads from 0xCFC (config data read). bus=0, device=1 only.
+					IDSEL_OUT <= 1'b1;
+					CBE_OUT <= CMD_CFGR;
+					AD_OUT <= pci_config_addr;	// Target pci_config_addr.
+					FRAME_N_OUT	<= 1'b0;			// Assert FRAME_N.
+					CONT_OE <= 1'b1;				// Assert PAR and CBE onto the bus.
+					AD_OE <= 1'b1;					// Allow AD_OUT assert on bus.
+					io_waitrequest <= 1'b1;
+					PCI_STATE <= 1;
+				end
 			end
 			
 			if (avm_write) begin				// MEMIO WRITE.
@@ -345,11 +361,15 @@ else begin
 		end
 
 		2: begin
-			if (!PCI_TRDY_N) begin			// Target has data ready!
+			timeout <= timeout - 4'd1;
+			if (!PCI_TRDY_N || timeout==4'd0) begin			// Target has data ready!
+				readdata <= PCI_AD;
 				if (io_access) io_readdatavalid <= 1'b1;
 				else avm_readdatavalid <= 1'b1;
 				PCI_IRDY_N_REG <= 1'b1;		// De-assert IRDY_N.
 				PCI_STOP_N_OUT <= 1'b0;
+				io_waitrequest <= 1'b0;		// To handle cases where io_read is held HIGH before state 0.
+				avm_waitrequest <= 1'b0;	// To handle cases where avm_read is held HIGH before state 0.
 				PCI_STATE <= 0;
 			end
 		end
@@ -357,9 +377,10 @@ else begin
 		
 		// WRITE...
 		3: begin
+			timeout <= timeout - 4'd1;
 			IDSEL_OUT <= 1'b0;				// De-assert IDSEL after the io_address phase.
 			FRAME_N_OUT <= 1'b1;				// De-assert FRAME_N (last/only data word).
-			if (!PCI_TRDY_N) begin
+			if (!PCI_TRDY_N || timeout==4'd0) begin
 				AD_OUT <= pci_config_writedata;
 				if (io_access) CBE_OUT <= 4'b0000;	// Byte-Enable bits are Active-LOW!
 				else CBE_OUT <= ~avm_byteenable;		// Byte-Enable bits are Active-LOW!
@@ -373,6 +394,8 @@ else begin
 			CONT_OE <= 1'b0;
 			PCI_IRDY_N_REG <= 1'b1;			// De-assert IRDY_N.
 			PCI_STOP_N_OUT <= 1'b0;
+			io_waitrequest <= 1'b0;			// To handle cases where io_write is held HIGH before state 0.
+			avm_waitrequest <= 1'b0;		// To handle cases where avm_write is held HIGH before state 0.
 			PCI_STATE <= 0;
 		end
 

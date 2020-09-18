@@ -104,6 +104,88 @@ set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[*]
 set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[*]
 set_instance_assignment -name ALLOW_SYNCH_CTRL_USAGE OFF -to *|SDRAM_*
 
+
+#============================================================
+# PCI Adapter
+#============================================================
+# GPIO_0 (Normally SDRAM)...
+set_location_assignment PIN_V12 -to PCI_SBO_N
+set_location_assignment PIN_E8 -to PCI_SERR_N
+set_location_assignment PIN_W12 -to PCI_PAR
+set_location_assignment PIN_D11 -to PCI_CBE[1]
+set_location_assignment PIN_D8 -to PCI_AD[15]
+set_location_assignment PIN_AH13 -to PCI_AD[14]
+set_location_assignment PIN_AF7 -to PCI_AD[13]
+set_location_assignment PIN_AH14 -to PCI_AD[12]
+set_location_assignment PIN_AF4 -to PCI_AD[11]
+set_location_assignment PIN_AH3 -to PCI_AD[10]
+
+set_location_assignment PIN_AD5 -to PCI_AD[9]
+set_location_assignment PIN_AG14 -to PCI_AD[8]
+set_location_assignment PIN_AE23 -to PCI_CBE[0]
+set_location_assignment PIN_AE6 -to PCI_AD[7]
+set_location_assignment PIN_AD23 -to PCI_AD[6]
+set_location_assignment PIN_AE24 -to PCI_AD[5]
+set_location_assignment PIN_D12 -to PCI_AD[4]
+set_location_assignment PIN_AD20 -to PCI_AD[3]
+set_location_assignment PIN_C12 -to PCI_AD[2]
+set_location_assignment PIN_AD17 -to PCI_AD[1]
+set_location_assignment PIN_AC23 -to PCI_AD[0]
+set_location_assignment PIN_AC22 -to PCI_GNT_N
+
+
+# GPIO_1 (Normally IO Board)...
+set_location_assignment PIN_Y15 -to PCI_INTA_N
+set_location_assignment PIN_AC24 -to PCI_INTB_N
+set_location_assignment PIN_AA15 -to PCI_INTC_N
+set_location_assignment PIN_AD26 -to PCI_INTD_N
+set_location_assignment PIN_AG28 -to PCI_PRSNT1_N
+set_location_assignment PIN_AF28 -to PCI_PRSNT2_N
+set_location_assignment PIN_AE25 -to PCI_RST_N
+set_location_assignment PIN_AF27 -to PCI_CLK
+set_location_assignment PIN_AG26 -to PCI_REQ_N
+set_location_assignment PIN_AH27 -to PCI_AD[31]
+
+set_location_assignment PIN_AG25 -to PCI_AD[30]
+set_location_assignment PIN_AH26 -to PCI_AD[29]
+set_location_assignment PIN_AH24 -to PCI_AD[28]
+set_location_assignment PIN_AF25 -to PCI_AD[27]
+set_location_assignment PIN_AG23 -to PCI_AD[26]
+set_location_assignment PIN_AF23 -to PCI_AD[25]
+set_location_assignment PIN_AG24 -to PCI_AD[24]
+set_location_assignment PIN_AH22 -to PCI_CBE[3]
+set_location_assignment PIN_AH21 -to PCI_IDSEL
+set_location_assignment PIN_AG21 -to PCI_AD[23]
+set_location_assignment PIN_AH23 -to PCI_AD[22]
+set_location_assignment PIN_AA20 -to PCI_AD[21]
+set_location_assignment PIN_AF22 -to PCI_AD[20]
+set_location_assignment PIN_AE22 -to PCI_AD[19]
+set_location_assignment PIN_AG20 -to PCI_AD[18]
+set_location_assignment PIN_AF21 -to PCI_AD[17]
+
+set_location_assignment PIN_AG19 -to PCI_AD[16]
+set_location_assignment PIN_AH19 -to PCI_CBE[2]
+set_location_assignment PIN_AG18 -to PCI_FRAME_N
+set_location_assignment PIN_AH18 -to PCI_IRDY_N
+set_location_assignment PIN_AF18 -to PCI_TRDY_N
+set_location_assignment PIN_AF20 -to PCI_DEVSEL_N
+set_location_assignment PIN_AG15 -to PCI_STOP_N
+set_location_assignment PIN_AE20 -to PCI_LOCK_N
+set_location_assignment PIN_AE19 -to PCI_PERR_N
+set_location_assignment PIN_AE17 -to PCI_SDONE
+
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to PCI_*
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to PCI_*
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to PCI_*
+
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to PCI_AD[*]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to PCI_AD[*]
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to PCI_AD[*]
+
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to PCI_CBE[*]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to PCI_CBE[*]
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to PCI_CBE[*]
+
 #============================================================
 # SPI SD
 #============================================================
