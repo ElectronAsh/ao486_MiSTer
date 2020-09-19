@@ -239,7 +239,7 @@ localparam CMD_MEMWI = 4'b1111;
 
 (*noprune*) reg [31:0] readdata;
 
-(*noprune*) reg [4:0] timeout;
+(*noprune*) reg [5:0] timeout;
 
 always @(posedge clk or negedge rst_n)
 if (!rst_n) begin
@@ -279,7 +279,7 @@ else begin
 			CONT_OE <= 1'b0;
 			PCI_IRDY_N_REG <= 1'b1;
 			
-			timeout <= 5'd31;
+			timeout <= 6'd63;
 		
 			if (avm_read) begin				// MEMIO READ.
 				io_access <= 1'b0;
@@ -321,7 +321,7 @@ else begin
 					IDSEL_OUT <= 1'b1;
 					CBE_OUT <= CMD_CFGW;
 					pci_config_writedata <= io_writedata;
-					AD_OUT <= io_address;	// Target io_addressess.
+					AD_OUT <= pci_config_addr;	// Target pci_config_addr.
 					FRAME_N_OUT	<= 1'b0;		// Assert FRAME_N.
 					CONT_OE <= 1'b1;			// Assert PAR and CBE onto the bus.
 					AD_OE <= 1'b1;				// Allow AD_OUT assert on bus.
@@ -336,14 +336,13 @@ else begin
 			AD_OE <= 1'b0;						// Allow READ from target.
 			IDSEL_OUT <= 1'b0;				// De-assert IDSEL after the io_addressess phase (if set in state 0).
 			CBE_OUT <= 4'b0000;				// Byte-Enable bits are Active-LOW!
-			PCI_IRDY_N_REG <= 1'b0;			// Ready to accept data.
 			FRAME_N_OUT <= 1'b1;				// De-assert FRAME_N (last/only data word).
+			PCI_IRDY_N_REG <= 1'b0;			// Ready to accept data.
 			PCI_STATE <= PCI_STATE + 1;
 		end
 
 		2: begin
-			timeout <= timeout - 5'd1;
-			if (!PCI_TRDY_N || timeout==5'd0) begin			// Target has data ready!
+			if (!PCI_TRDY_N || timeout==6'd0) begin			// Target has data ready!
 				readdata <= PCI_AD;
 				if (io_access) io_readdatavalid <= 1'b1;
 				else avm_readdatavalid <= 1'b1;
@@ -352,31 +351,34 @@ else begin
 				//avm_waitrequest <= 1'b0;	// To handle cases where avm_read is held HIGH before state 0.
 				PCI_STATE <= 0;
 			end
+			else timeout <= timeout - 6'd1;
 		end
 
 		
 		// WRITE...
 		3: begin
-			timeout <= timeout - 5'd1;
-			IDSEL_OUT <= 1'b0;				// De-assert IDSEL after the io_address phase.
-			FRAME_N_OUT <= 1'b1;				// De-assert FRAME_N (last/only data word).
-			if (!PCI_TRDY_N || timeout==5'd0) begin
-				AD_OUT <= pci_config_writedata;
-				if (io_access) CBE_OUT <= 4'b0000;	// Byte-Enable bits are Active-LOW!
-				else CBE_OUT <= ~avm_byteenable;		// Byte-Enable bits are Active-LOW!
-				PCI_IRDY_N_REG <= 1'b0;					// We have put valid data onto the bus.
-				PCI_STATE <= PCI_STATE + 1;
+			IDSEL_OUT <= 1'b0;					// De-assert IDSEL after the address phase.
+			FRAME_N_OUT <= 1'b1;					// De-assert FRAME_N (last/only data word).
+			AD_OUT <= pci_config_writedata;	// Output the data onto the bus (before TRDY_N has chance to go low!)
+			PCI_IRDY_N_REG <= 1'b0;				// We are ready to transfer data to the card...
+			
+			/*if (io_access)*/ CBE_OUT <= 4'b0000;	// Byte-Enable bits are Active-LOW!
+			//else CBE_OUT <= ~avm_byteenable;		// Byte-Enable bits are Active-LOW!
+			
+			if (!PCI_TRDY_N || timeout==6'd0) begin	// TRDY_N goes Low when the card has accepted the data.
+				PCI_IRDY_N_REG <= 1'b1;			// De-assert IRDY_N.
+				AD_OE <= 1'b0;
+				CONT_OE <= 1'b0;
+				PCI_STATE <= 0;
 			end
+			else timeout <= timeout - 6'd1;
 		end
 
-		4: begin
-			AD_OE <= 1'b0;
-			CONT_OE <= 1'b0;
-			PCI_IRDY_N_REG <= 1'b1;			// De-assert IRDY_N.
+		//4: begin
 			//io_waitrequest <= 1'b0;			// To handle cases where io_write is held HIGH before state 0.
 			//avm_waitrequest <= 1'b0;		// To handle cases where avm_write is held HIGH before state 0.
-			PCI_STATE <= 0;
-		end
+			//PCI_STATE <= 0;
+		//end
 
 		default:;
 	endcase
