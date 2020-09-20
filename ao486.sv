@@ -352,10 +352,10 @@ pll pll
 (
 	.refclk(CLK_50M),
 	.rst(0),
-	.outclk_0(clk_sys),
-	.outclk_1(clk_uart),
-	.outclk_2(clk_opl),
-	.outclk_3(clk_vga),
+	.outclk_0(clk_sys),	// 90 MHz (default).
+	.outclk_1(clk_uart),	// 60 MHz (default).
+	.outclk_2(clk_opl),	// 50 MHz (default).
+	.outclk_3(clk_vga),	// 90 MHz (default).
 	.locked(pll_locked),
 	.reconfig_to_pll(reconfig_to_pll),
 	.reconfig_from_pll(reconfig_from_pll)

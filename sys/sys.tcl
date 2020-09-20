@@ -186,6 +186,18 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to PCI_CBE
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to PCI_CBE[*]
 set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to PCI_CBE[*]
 
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to PCI_*
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to PCI_*
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to PCI_*
+
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to PCI_AD[*]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to PCI_AD[*]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to PCI_AD[*]
+
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to PCI_CBE[*]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to PCI_CBE[*]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to PCI_CBE[*]
+
 #============================================================
 # SPI SD
 #============================================================

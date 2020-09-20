@@ -247,8 +247,8 @@ l2_cache cache
 	.CPU_BE            (mem_byteenable),
 	.CPU_BURSTCNT      (mem_burstcount),
 	.CPU_BUSY          (mem_waitrequest),
-	.CPU_RD            (mem_read),
-	.CPU_WE            (mem_write),
+	.CPU_RD            (mem_read && !pci_mem_cs),
+	.CPU_WE            (mem_write && !pci_mem_cs),
 
 	.DDRAM_ADDR        (DDRAM_ADDR),
 	.DDRAM_DIN         (DDRAM_DIN),
@@ -272,6 +272,7 @@ l2_cache cache
 	.VGA_FB_EN         (video_fb_en)
 );
 
+
 ao486 ao486
 (
 	.clk               (clk_sys),
@@ -285,9 +286,14 @@ ao486 ao486
 	.avm_burstcount    (mem_burstcount),
 	.avm_write         (mem_write),
 	.avm_read          (mem_read),
-	.avm_waitrequest   (mem_waitrequest),
-	.avm_readdatavalid (mem_readdatavalid),
-	.avm_readdata      (mem_readdata),
+	
+	.avm_waitrequest   (mem_waitrequest | pci_mem_waitrequest),
+
+	//.avm_readdatavalid (mem_readdatavalid),
+	.avm_readdatavalid (mem_readdatavalid | pci_mem_readdatavalid),
+
+	//.avm_readdata      (mem_readdata),
+	.avm_readdata      ( (pci_mem_readdatavalid) ? pci_mem_readdata : mem_readdata ),
 
 	.interrupt_do      (interrupt_do),
 	.interrupt_vector  (interrupt_vector),
@@ -743,7 +749,7 @@ wire [31:0] pci_mem_readdata;
 wire pci_irq_out;
 //assign irq_11 = pci_irq_out;
 
-wire pci_mem_cs = 1'b0;	// todo !
+(*keep*) wire pci_mem_cs = mem_address[29:26]==4'b1100;	// 0x30000000 (word address). 0xC0000000 (byte address).
 
 pci pci
 (
@@ -758,7 +764,7 @@ pci pci
 	.io_waitrequest(pci_io_waitrequest) ,			// output  io_waitrequest
 	.io_readdatavalid(pci_io_readdatavalid) ,		// output  io_readdatavalid
 	
-	.avm_address(mem_address) ,						// input [21:0] avm_address
+	.avm_address(mem_address) ,						// input [29:0] avm_address
 	.avm_writedata(mem_writedata) ,					// input [31:0] avm_writedata
 	.avm_byteenable(mem_byteenable) ,				// input [3:0] avm_byteenable
 	.avm_burstcount(mem_burstcount) ,				// input [2:0] avm_burstcount

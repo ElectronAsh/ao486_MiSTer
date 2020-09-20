@@ -12,7 +12,7 @@ module pci (
 	output reg 		    io_readdatavalid,
 
 	// Avalon mem bus.
-	input      [21:0]  avm_address,
+	input      [29:0]  avm_address,		// WORD address!
 	input      [31:0]  avm_writedata,
 	input      [3:0]   avm_byteenable,
 	input      [3:0]   avm_burstcount,
@@ -37,15 +37,17 @@ module pci (
 	inout			PCI_SERR_N,		// Pulled high atm. Todo - add a pull-up to the adapter. Address/data/special parity error.
 	inout			PCI_PERR_N,		// Pulled high atm. Todo - add a pull-up to the adapter. Parity error, expect Special Cycle.
 	
-	inout			PCI_SBO_N,		// ignored atm.
-	inout			PCI_SDONE,		// ignored atm. 
+	inout			PCI_SBO_N,		// ignored atm. Snoop Backoff (Snoop Dogg's Russian cousin).
+	inout			PCI_SDONE,		// ignored atm. Snoop Done.
 	inout			PCI_LOCK_N,		// ignored atm. Used to implement exclusive access on the PCI bus.
 	inout			PCI_STOP_N,		// ignored atm. FROM the target (card), used to abort a transfer.
 	
-	inout			PCI_DEVSEL_N,	// Asserted by the device (card) when it decodes a valid address. (or when it sees IDSEL during the addr phase).
-	inout			PCI_TRDY_N,		// Asserted by the Target (device) when it is able to transfer data.
-	inout			PCI_IRDY_N,		// Asserted by the Initiator (host) when it is able to transfer data.
 	inout			PCI_FRAME_N,	// Asserted by the host to denote the start and end of a PCI transaction. (or for ONE clock cycle for IDSEL).
+	
+	input			PCI_DEVSEL_N,	// Asserted by the device (card) when it decodes a valid address. (or when it sees IDSEL during the addr phase).
+	input			PCI_TRDY_N,		// Asserted by the Target (device) when it is able to transfer data.
+	
+	inout			PCI_IRDY_N,		// Asserted by the Initiator (usually the host) when it is able to transfer data.
 	
 	output		PCI_CLK,			// 33 MHz clock to the card.
 	output		PCI_RST_N,		// Reset_n to the card.
@@ -63,8 +65,8 @@ assign io_readdata = readdata;
 assign avm_readdata = readdata;
 
 
-//assign PCI_CLK = !clk;	// Invert the clock to the PCI card, as it samples our signals on the RISING edge.
-assign PCI_CLK = clk;		// TESTING posedge clock.
+assign PCI_CLK = !clk;	// Invert the clock to the PCI card, as it samples our signals on the RISING edge.
+//assign PCI_CLK = clk;		// TESTING posedge clock (seems to work fine for the Adaptec SCSI card, for CFG reg access.)
 
 assign PCI_RST_N = rst_n;
 
@@ -119,7 +121,7 @@ localparam class_code	= 24'h038000;	// "Display Controller. non-VGA compatible)"
 */
 
 (*noprune*) reg [31:0] pci_config_addr;		// 0xCF8.
-(*noprune*) reg [31:0] pci_config_writedata;	// 0xCFC.
+//(*noprune*) reg [31:0] pci_config_writedata;	// 0xCFC.
 
 (*keep*) wire [7:0] bus 	= pci_config_addr[23:16];
 (*keep*) wire [4:0] device	= pci_config_addr[15:11];
@@ -238,6 +240,7 @@ localparam CMD_MEMWI = 4'b1111;
 (*noprune*) reg io_access;
 
 (*noprune*) reg [31:0] readdata;
+(*noprune*) reg [31:0] writedata;
 
 (*noprune*) reg [5:0] timeout;
 
@@ -285,10 +288,10 @@ else begin
 				io_access <= 1'b0;
 				IDSEL_OUT <= 1'b0;
 				CBE_OUT <= CMD_MEMR;
-				AD_OUT <= avm_address;		// Target avm_address.
-				FRAME_N_OUT	<= 1'b0;			// Assert FRAME_N.
-				CONT_OE <= 1'b1;				// Assert PAR and CBE onto the bus.
-				AD_OE <= 1'b1;					// Allow AD_OUT assert on bus.
+				AD_OUT <= {avm_address, 2'b00};	// Target avm_address. avm_address is the WORD address!
+				FRAME_N_OUT	<= 1'b0;					// Assert FRAME_N.
+				CONT_OE <= 1'b1;						// Assert PAR and CBE onto the bus.
+				AD_OE <= 1'b1;							// Allow AD_OUT assert on bus.
 				PCI_STATE <= 1;
 			end
 			else if (io_read) begin			// IO (PCI Config Space) READ.
@@ -306,21 +309,22 @@ else begin
 			
 			if (avm_write) begin				// MEMIO WRITE.
 				io_access <= 1'b0;
+				writedata <= avm_writedata;		// Grab the writedata.
 				IDSEL_OUT <= 1'b0;
 				CBE_OUT <= CMD_MEMW;
-				AD_OUT <= avm_address;		// Target avm_address.
-				FRAME_N_OUT	<= 1'b0;			// Assert FRAME_N.
-				CONT_OE <= 1'b1;				// Assert PAR and CBE onto the bus.
-				AD_OE <= 1'b1;					// Allow AD_OUT assert on bus.
-				PCI_STATE <= 7;
+				AD_OUT <=  {avm_address, 2'b00};	// Target avm_address. avm_address is the WORD address!
+				AD_OE <= 1'b1;							// Allow AD_OUT assert on bus.
+				CONT_OE <= 1'b1;						// Assert PAR and CBE onto the bus.
+				FRAME_N_OUT	<= 1'b0;					// Assert FRAME_N.
+				PCI_STATE <= 3;
 			end
 			else if (io_write) begin		// IO (PCI Config Space) WRITE.
-				io_access <= 1'b1;
 				if (!io_address) pci_config_addr <= io_writedata;	// Handle writes to the pci_config_addr reg at 0xCF8.
 				else if (bus==8'd0 && device==5'd1) begin				// Write to 0xCFC (config data write). bus=0, device=1 only.
+					io_access <= 1'b1;
+					writedata <= io_writedata;
 					IDSEL_OUT <= 1'b1;
 					CBE_OUT <= CMD_CFGW;
-					pci_config_writedata <= io_writedata;
 					AD_OUT <= pci_config_addr;	// Target pci_config_addr.
 					FRAME_N_OUT	<= 1'b0;		// Assert FRAME_N.
 					CONT_OE <= 1'b1;			// Assert PAR and CBE onto the bus.
@@ -359,7 +363,7 @@ else begin
 		3: begin
 			IDSEL_OUT <= 1'b0;					// De-assert IDSEL after the address phase.
 			FRAME_N_OUT <= 1'b1;					// De-assert FRAME_N (last/only data word).
-			AD_OUT <= pci_config_writedata;	// Output the data onto the bus (before TRDY_N has chance to go low!)
+			AD_OUT <= writedata;					// Output the data onto the bus (before TRDY_N has chance to go low!)
 			PCI_IRDY_N_REG <= 1'b0;				// We are ready to transfer data to the card...
 			
 			/*if (io_access)*/ CBE_OUT <= 4'b0000;	// Byte-Enable bits are Active-LOW!
@@ -367,8 +371,8 @@ else begin
 			
 			if (!PCI_TRDY_N || timeout==6'd0) begin	// TRDY_N goes Low when the card has accepted the data.
 				PCI_IRDY_N_REG <= 1'b1;			// De-assert IRDY_N.
-				AD_OE <= 1'b0;
-				CONT_OE <= 1'b0;
+				//AD_OE <= 1'b0;					// TESTING !!
+				//CONT_OE <= 1'b0;				// TESTING !! Allowing state 0 to deassert these, to hold the data for longer.
 				PCI_STATE <= 0;
 			end
 			else timeout <= timeout - 6'd1;
