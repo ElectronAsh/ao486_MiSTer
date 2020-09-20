@@ -296,7 +296,7 @@ else begin
 			end
 			else if (io_read) begin			// IO (PCI Config Space) READ.
 				io_access <= 1'b1;
-				if (bus==8'd0 && device==5'd1) begin		// Allow reads from 0xCFC (config data read). bus=0, device=1 only.
+				if (bus==8'd0 && device==5'd2) begin		// Allow reads from 0xCFC (config data read). bus=0, device=2 only.
 					IDSEL_OUT <= 1'b1;
 					CBE_OUT <= CMD_CFGR;
 					AD_OUT <= pci_config_addr;	// Target pci_config_addr.
@@ -320,7 +320,7 @@ else begin
 			end
 			else if (io_write) begin		// IO (PCI Config Space) WRITE.
 				if (!io_address) pci_config_addr <= io_writedata;	// Handle writes to the pci_config_addr reg at 0xCF8.
-				else if (bus==8'd0 && device==5'd1) begin				// Write to 0xCFC (config data write). bus=0, device=1 only.
+				else if (bus==8'd0 && device==5'd2) begin				// Write to 0xCFC (config data write). bus=0, device=2 only.
 					io_access <= 1'b1;
 					writedata <= io_writedata;
 					IDSEL_OUT <= 1'b1;

@@ -747,7 +747,7 @@ wire pci_mem_readdatavalid;
 wire [31:0] pci_mem_readdata;
 
 wire pci_irq_out;
-//assign irq_11 = pci_irq_out;
+assign irq_11 = pci_irq_out;
 
 (*keep*) wire pci_mem_cs = mem_address[29:26]==4'b1100;	// 0x30000000 (word address). 0xC0000000 (byte address).
 
