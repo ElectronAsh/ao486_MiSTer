@@ -2,20 +2,23 @@ module pci (
 	input			clk,
 	input			rst_n,
     
-	//io slave CF8h-CFCh
-	input              io_address,
+	// IO slave.
+	input       [15:0] io_address,
 	input              io_read,
 	output wire [31:0] io_readdata,
-	input              io_write,
-	input      [31:0]  io_writedata,
-	output             io_waitrequest,
 	output reg 		    io_readdatavalid,
+	input       [2:0]  io_read_length,
+	
+	input              io_write,
+	input       [31:0] io_writedata,
+	output             io_waitrequest,
+	input       [2:0]  io_write_length,	
 
 	// Avalon mem bus.
-	input      [29:0]  avm_address,		// WORD address!
-	input      [31:0]  avm_writedata,
-	input      [3:0]   avm_byteenable,
-	input      [3:0]   avm_burstcount,
+	input       [29:0] avm_address,		// WORD address!
+	input       [31:0] avm_writedata,
+	input       [3:0]  avm_byteenable,
+	input       [3:0]  avm_burstcount,
 	input              avm_write,
 	input              avm_read,
 	 
@@ -65,7 +68,7 @@ assign io_readdata = readdata;
 assign avm_readdata = readdata;
 
 
-assign PCI_CLK = !clk;	// Invert the clock to the PCI card, as it samples our signals on the RISING edge.
+assign PCI_CLK = !clk;	// Invert the clock to the PCI card, as it samples our signals on the RISING edge. Works best for the Voodoo 1.
 //assign PCI_CLK = clk;		// TESTING posedge clock (seems to work fine for the Adaptec SCSI card, for CFG reg access.)
 
 assign PCI_RST_N = rst_n;
@@ -90,120 +93,6 @@ assign pci_irq_out = !PCI_INTA_N;
 assign io_waitrequest  = io_access && PCI_STATE>0;
 assign avm_waitrequest = !io_access && PCI_STATE>0;
 
-/*
-localparam vendor_id 	= 16'h121A;	// 3Dfx Interactive, Inc.
-localparam device_id 	= 16'h0001;	// Voodoo card.
-localparam revision_id 	= 8'h01;	// rev 1.
-localparam class_code	= 24'h038000;	// "Display Controller. non-VGA compatible)"?
-
-(*noprune*) reg [15:0] command_reg;
-(*noprune*) reg [15:0] status_reg;
-(*noprune*) reg [7:0] cache_line_size;
-(*noprune*) reg [7:0] latency_timer;
-(*noprune*) reg [7:0] header_type;
-(*noprune*) reg [7:0] bist;
-//(*noprune*) reg [31:0] membase_addr;
-(*noprune*) reg [7:0] interrupt_line;
-(*noprune*) reg [7:0] interrupt_pin;
-(*noprune*) reg [7:0] min_gnt;
-(*noprune*) reg [7:0] max_lat;
-
-(*noprune*) reg [31:0] init_enable;
-(*noprune*) reg [31:0] bussnoop0;
-(*noprune*) reg [31:0] bussnoop1;
-(*noprune*) reg [31:0] cfgstatus;
-(*noprune*) reg [31:0] cfgscratch;
-(*noprune*) reg [31:0] siprocess;
-
-
-(*noprune*) reg [7:0] bar0_upper_byte;
-(*noprune*) reg bar0_set;
-*/
-
-(*noprune*) reg [31:0] pci_config_addr;		// 0xCF8.
-//(*noprune*) reg [31:0] pci_config_writedata;	// 0xCFC.
-
-(*keep*) wire [7:0] bus 	= pci_config_addr[23:16];
-(*keep*) wire [4:0] device	= pci_config_addr[15:11];
-(*keep*) wire [2:0] func	= pci_config_addr[10:8];
-(*keep*) wire [5:0] pcireg	= pci_config_addr[7:2];
-
-/*
-always @(posedge clk or negedge rst_n)
-if (!rst_n) begin
-	command_reg <= 32'h00000000;
-	status_reg <= 32'h00000000;
-	cache_line_size <= 8'h00;
-	latency_timer <= 8'h00;
-	header_type <= 8'h00;		// Header Type - 00h Standard Header - 01h PCI-to-PCI Bridge - 02h CardBus Bridge
-	bist <= 8'h00;
-	interrupt_line <= 8'h00;
-	interrupt_pin <= 8'h01;
-	min_gnt <= 8'h00;
-	max_lat <= 8'h00;
-	
-	//membase_addr <= 32'hff000000;	// default for Voodoo. (fb_addr_b[1]=0).
-	
-	init_enable <= 32'h00000000;
-	bussnoop0 <= 32'h00000000;
-	bussnoop1 <= 32'h00000000;
-	cfgstatus <= 32'h00000000;
-	cfgscratch <= 32'h00000000;
-	siprocess <= 32'h00000000;	// Not implemented yet.
-	
-	bar0_set <= 1'b0;
-end
-
-else begin
-	if (io_write) begin
-		// Handle writes to the pci_config_addr reg at 0xCF8.
-		if (!io_address) pci_config_addr <= io_writedata;
-
-		// Handle (data) writes to the PCI config registers via 0xCFC.
-		// Only really command_reg, membase_addr, and a few others that are writeable on the Voodoo 2.
-		if (pci_config_addr[31] && io_address && bus==8'd0 && device==5'd1) begin	// 0xCFC. Writes, to bus=0 / device=1 only...
-			case (pcireg)
-				//6'h0: // device_id / vendor_id. (read-only).
-				6'h1: command_reg <= io_writedata[15:0];	// status reg is read-only, from bits [31:16].
-				//6'h2: // class_code / revision_id (read_only).
-				//6'h3: // bist / header_type / latency_timer / cache_line_size (read-only).
-				
-				6'h4: begin
-					bar0_upper_byte <= io_writedata[31:24];
-					bar0_set <= 1'b1;
-				end
-
-				//6'hf: max_lat / min_gnt / interrupt_pin / interrupt_line (read-only).
-				default:;
-			endcase
-		end
-	end
-end
-
-// Handle config reads...
-always @* begin
-	if (pci_config_addr[31] && io_address && bus==8'd0 && device==5'd1) begin	// 0xCFC. Spoof reads, for bus=0 / device=1 only...
-		case (pcireg)
-			6'h0: io_readdata = {device_id, vendor_id};			// Word offset 0x00.
-			6'h1: io_readdata = {status_reg, command_reg};		// Word offset 0x04.
-			6'h2: io_readdata = {class_code, revision_id};		// Word offset 0x08.
-			6'h3: io_readdata = {bist, header_type, latency_timer, cache_line_size};	// Word offset 0x0C.
-			
-			6'h4: io_readdata = {bar0_upper_byte, 24'h000000};	// Word offset 0x10. (BAR0).
-
-			// Other Base Address registers not used on the Voodoo. I think?
-
-			// Last WORD of the PCI config regs...
-			6'hf: io_readdata = {max_lat, min_gnt, interrupt_pin, interrupt_line}; // Word offset 0x3C.
-			default: io_readdata = 32'hFFFFFFFF;
-		endcase
-	end
-	else begin
-		io_readdata = 32'hFFFFFFFF;	// Send back this value (-1) for all other busses/devices).
-	end
-end
-*/
-
 
 localparam CMD_IACK  = 4'b0000;
 localparam CMD_SPEC  = 4'b0001;
@@ -223,6 +112,13 @@ localparam CMD_MEMRL = 4'b1110;
 localparam CMD_MEMWI = 4'b1111;
 
 
+(*noprune*) reg [31:0] pci_config_addr;		// 0xCF8 (to 0xCFB).
+(*keep*) wire [7:0] bus 	= pci_config_addr[23:16];
+(*keep*) wire [4:0] device	= pci_config_addr[15:11];
+(*keep*) wire [2:0] func	= pci_config_addr[10:8];
+(*keep*) wire [5:0] pcireg	= pci_config_addr[7:2];
+
+(*noprune*) reg [15:0] io_addr_latch;
 
 (*noprune*) reg FRAME_N_OUT;
 (*noprune*) reg IDSEL_OUT;
@@ -294,16 +190,29 @@ else begin
 				AD_OE <= 1'b1;							// Allow AD_OUT assert on bus.
 				PCI_STATE <= 1;
 			end
-			else if (io_read) begin			// IO (PCI Config Space) READ.
+			else if (io_read) begin				// IO (PCI Config Space) READ.
 				io_access <= 1'b1;
-				if (bus==8'd0 && device==5'd2) begin		// Allow reads from 0xCFC (config data read). bus=0, device=2 only.
-					IDSEL_OUT <= 1'b1;
-					CBE_OUT <= CMD_CFGR;
-					AD_OUT <= pci_config_addr;	// Target pci_config_addr.
-					FRAME_N_OUT	<= 1'b0;			// Assert FRAME_N.
-					CONT_OE <= 1'b1;				// Assert PAR and CBE onto the bus.
-					AD_OE <= 1'b1;					// Allow AD_OUT assert on bus.
-					PCI_STATE <= 1;
+				if (1 /*bus==8'd0 && device==5'd2*/) begin	// Allow DATA reads from bus=0, device=2 only.
+					if (io_address>=16'h0CFC && io_address<=16'h0CFF) begin
+						IDSEL_OUT <= 1'b1;
+						CBE_OUT <= CMD_CFGR;			// PCI Config DATA read.
+						AD_OUT <= pci_config_addr;	// Target pci_config_addr.
+						io_addr_latch <= pci_config_addr;
+						FRAME_N_OUT	<= 1'b0;			// Assert FRAME_N.
+						CONT_OE <= 1'b1;				// Assert PAR and CBE onto the bus.
+						AD_OE <= 1'b1;					// Allow AD_OUT assert on bus.
+						PCI_STATE <= 1;
+					end
+					/*else begin
+						IDSEL_OUT <= 1'b0;
+						CBE_OUT <= CMD_IOR;		// Normal IO range read.
+						AD_OUT <= io_address;	// Target io_address.
+						io_addr_latch <= io_address;
+						FRAME_N_OUT	<= 1'b0;			// Assert FRAME_N.
+						CONT_OE <= 1'b1;				// Assert PAR and CBE onto the bus.
+						AD_OE <= 1'b1;					// Allow AD_OUT assert on bus.
+						PCI_STATE <= 1;
+					end*/
 				end
 			end
 			
@@ -319,17 +228,40 @@ else begin
 				PCI_STATE <= 3;
 			end
 			else if (io_write) begin		// IO (PCI Config Space) WRITE.
-				if (!io_address) pci_config_addr <= io_writedata;	// Handle writes to the pci_config_addr reg at 0xCF8.
-				else if (bus==8'd0 && device==5'd2) begin				// Write to 0xCFC (config data write). bus=0, device=2 only.
-					io_access <= 1'b1;
-					writedata <= io_writedata;
-					IDSEL_OUT <= 1'b1;
-					CBE_OUT <= CMD_CFGW;
-					AD_OUT <= pci_config_addr;	// Target pci_config_addr.
-					FRAME_N_OUT	<= 1'b0;		// Assert FRAME_N.
-					CONT_OE <= 1'b1;			// Assert PAR and CBE onto the bus.
-					AD_OE <= 1'b1;				// Allow AD_OUT assert on bus.
-					PCI_STATE <= 3;
+				io_access <= 1'b1;
+				// Not sure whether to ignore the MSB (enable) bit io_writedata for PCI Config addr,
+				// or put it onto the PCI bus during the address phase? ElectronAsh.
+				if (io_address>=16'h0CF8 && io_address<=16'h0CFB) begin	// Handle writes to pci_config_addr at 0xCF8-0xCFB.
+					case (io_address[1:0])
+						2'd0: pci_config_addr[31:00] <= io_writedata[31:00];	// 0xCF8. 32-bit aligned. TODO - double check this, for all instructions!
+						2'd1: pci_config_addr[15:08] <= io_writedata[07:00];	// 0xCF9.
+						2'd2: pci_config_addr[23:16] <= io_writedata[07:00];	// 0xCFA.
+						2'd3: pci_config_addr[31:24] <= io_writedata[07:00];	// 0xCFB.
+					endcase
+				end
+				else if (bus==8'd0 && device==5'd2) begin		// bus=0, device=2 only.
+					if (io_address>=16'h0CFC && io_address<=16'h0CFF) begin	// Allow CONFIG writes.
+						IDSEL_OUT <= 1'b1;
+						CBE_OUT <= CMD_CFGW;			// PCI config DATA write.
+						AD_OUT <= pci_config_addr;	// Target pci_config_addr.
+						io_addr_latch <= io_address;
+						writedata <= io_writedata;
+						FRAME_N_OUT	<= 1'b0;		// Assert FRAME_N.
+						CONT_OE <= 1'b1;			// Assert PAR and CBE onto the bus.
+						AD_OE <= 1'b1;				// Allow AD_OUT assert on bus.
+						PCI_STATE <= 3;
+					end
+					else if (io_address>=16'h03B0 && io_address<=16'h03DF) begin	// Allow normal IO writes. (TESTING VGA REGS!)
+						IDSEL_OUT <= 1'b0;
+						CBE_OUT <= CMD_IOW;		// Normal IO range write.
+						AD_OUT <= io_address;	// Target io_address.
+						io_addr_latch <= io_address;
+						writedata <= io_writedata;
+						FRAME_N_OUT	<= 1'b0;		// Assert FRAME_N.
+						CONT_OE <= 1'b1;			// Assert PAR and CBE onto the bus.
+						AD_OE <= 1'b1;				// Allow AD_OUT assert on bus.
+						PCI_STATE <= 3;
+					end
 				end
 			end
 		end
@@ -339,20 +271,37 @@ else begin
 		1: begin
 			AD_OE <= 1'b0;						// Allow READ from target.
 			IDSEL_OUT <= 1'b0;				// De-assert IDSEL after the io_addressess phase (if set in state 0).
-			CBE_OUT <= 4'b0000;				// Byte-Enable bits are Active-LOW!
+			CBE_OUT <= 4'b0000;				// Byte-Enable bits are Active-LOW! (assuming this is needed for reads?)
 			FRAME_N_OUT <= 1'b1;				// De-assert FRAME_N (last/only data word).
 			PCI_IRDY_N_REG <= 1'b0;			// Ready to accept data.
 			PCI_STATE <= PCI_STATE + 1;
 		end
 
 		2: begin
-			if (!PCI_TRDY_N || timeout==6'd0) begin			// Target has data ready!
-				readdata <= PCI_AD;
+			if (!PCI_TRDY_N && bus==8'd0 && device==5'd2) begin	// Target has data ready!
+				if (io_access) begin
+					case (io_addr_latch[1:0])
+						2'd0: readdata[31:00] <= PCI_AD[31:00];	// 32-bit aligned. TODO - double check this, for all instructions!
+						2'd1: readdata[07:00] <= PCI_AD[15:08];	// 
+						2'd2: readdata[07:00] <= PCI_AD[23:16];	// 
+						2'd3: readdata[07:00] <= PCI_AD[31:24];	// 
+					endcase
+					io_readdatavalid <= 1'b1;
+				end
+				else begin							// Handle mem-mapped READ.
+					readdata <= PCI_AD;
+					avm_readdatavalid <= 1'b1;
+				end
+				
+				PCI_IRDY_N_REG <= 1'b1;			// De-assert IRDY_N.
+				//io_waitrequest <= 1'b0;		// To handle cases where io_read is held HIGH before state 0.
+				//avm_waitrequest <= 1'b0;		// To handle cases where avm_read is held HIGH before state 0.
+				PCI_STATE <= 0;
+			end
+			else if (timeout==6'd0) begin
+				readdata <= 32'hFFFFFFFF;		// Null readdata, for both IO and Mem reads.
 				if (io_access) io_readdatavalid <= 1'b1;
 				else avm_readdatavalid <= 1'b1;
-				PCI_IRDY_N_REG <= 1'b1;		// De-assert IRDY_N.
-				//io_waitrequest <= 1'b0;		// To handle cases where io_read is held HIGH before state 0.
-				//avm_waitrequest <= 1'b0;	// To handle cases where avm_read is held HIGH before state 0.
 				PCI_STATE <= 0;
 			end
 			else timeout <= timeout - 6'd1;
@@ -363,24 +312,35 @@ else begin
 		3: begin
 			IDSEL_OUT <= 1'b0;					// De-assert IDSEL after the address phase.
 			FRAME_N_OUT <= 1'b1;					// De-assert FRAME_N (last/only data word).
-			AD_OUT <= writedata;					// Output the data onto the bus (before TRDY_N has chance to go low!)
 			PCI_IRDY_N_REG <= 1'b0;				// We are ready to transfer data to the card...
 			
-			/*if (io_access)*/ CBE_OUT <= 4'b0000;	// Byte-Enable bits are Active-LOW!
-			//else CBE_OUT <= ~avm_byteenable;		// Byte-Enable bits are Active-LOW!
+			if (io_access) begin
+				case (io_addr_latch[1:0])
+					2'd0: begin AD_OUT[31:00] <= writedata[31:00]; CBE_OUT <= 4'b0000; end	// 32-bit aligned. TODO - double check this, for all instructions!
+					2'd1: begin AD_OUT[15:08] <= writedata[07:00]; CBE_OUT <= 4'b1101; end	// 
+					2'd2: begin AD_OUT[23:16] <= writedata[07:00]; CBE_OUT <= 4'b1011; end	//
+					2'd3: begin AD_OUT[31:24] <= writedata[07:00]; CBE_OUT <= 4'b0111; end	//
+				endcase
+			end
+			else begin								// AVM / mem access. Always 32-bit? TODO - Check all write combinations!
+				AD_OUT <= writedata;				// Output the data onto the bus (before TRDY_N has chance to go low!)
+				CBE_OUT <= 4'b0000;
+				/*
+				if (io_access) CBE_OUT <= 4'b0000;	// Byte-Enable bits are Active-LOW!
+				//else CBE_OUT <= ~avm_byteenable;	// Byte-Enable bits are Active-LOW!
+				*/
+			end			
 			
 			if (!PCI_TRDY_N || timeout==6'd0) begin	// TRDY_N goes Low when the card has accepted the data.
 				PCI_IRDY_N_REG <= 1'b1;			// De-assert IRDY_N.
-				//AD_OE <= 1'b0;					// TESTING !!
-				//CONT_OE <= 1'b0;				// TESTING !! Allowing state 0 to deassert these, to hold the data for longer.
-				PCI_STATE <= 0;
+				PCI_STATE <= 0;					// State 0 will deassert AD_OE and CONT_OE.
 			end
 			else timeout <= timeout - 6'd1;
 		end
 
 		//4: begin
 			//io_waitrequest <= 1'b0;			// To handle cases where io_write is held HIGH before state 0.
-			//avm_waitrequest <= 1'b0;		// To handle cases where avm_write is held HIGH before state 0.
+			//avm_waitrequest <= 1'b0;			// To handle cases where avm_write is held HIGH before state 0.
 			//PCI_STATE <= 0;
 		//end
 
