@@ -197,7 +197,6 @@ reg         vga_b_cs;
 reg         vga_c_cs;
 reg         vga_d_cs;
 reg         sysctl_cs;
-(*noprune*) reg         pci_cfg_cs;
 
 wire  [7:0] sound_readdata;
 wire  [7:0] floppy0_readdata;
@@ -247,8 +246,8 @@ l2_cache cache
 	.CPU_BE            (mem_byteenable),
 	.CPU_BURSTCNT      (mem_burstcount),
 	.CPU_BUSY          (mem_waitrequest),
-	.CPU_RD            (mem_read && !pci_mem_cs),
-	.CPU_WE            (mem_write && !pci_mem_cs),
+	.CPU_RD            (mem_read && !pci_wait),
+	.CPU_WE            (mem_write && !pci_wait),
 
 	.DDRAM_ADDR        (DDRAM_ADDR),
 	.DDRAM_DIN         (DDRAM_DIN),
@@ -343,7 +342,6 @@ always @(posedge clk_sys) begin
 	vga_b_cs      <= ({iobus_address[15:4], 4'd0} == 16'h03B0);
 	vga_c_cs      <= ({iobus_address[15:4], 4'd0} == 16'h03C0);
 	vga_d_cs      <= ({iobus_address[15:4], 4'd0} == 16'h03D0);
-	pci_cfg_cs	  <= ({iobus_address[15:3], 3'd0} == 16'h0CF8);	// Decode 0xCF8-0xCFF, for PCI Config range.
 	sysctl_cs     <= ({iobus_address[15:0]      } == 16'h8888);
 end
 
@@ -749,13 +747,12 @@ wire [31:0] pci_mem_readdata;
 
 wire pci_irq_out;
 //assign irq_11 = pci_irq_out;
+assign irq_11 = 1'b0;
 
-//(*keep*) wire pci_mem_cs = mem_address[29:26]==4'b1100;	// 0x30000000 (word address). 0xCxxxxxxx (byte address).
-																			// Default start address for where the Bochs BIOs maps BAR0, for the first PCI device.
-
-//(*keep*) wire pci_mem_cs = mem_address>=30'h28000000 && mem_address<=30'h28007FFF;	// (word address). 0xA0000000-0xA0001FFFF (byte address). VGA regs.
-
-(*keep*) wire pci_mem_cs = mem_address[29:26]==4'b1000;
+wire pci_io_access;
+wire pci_cs_claim;
+wire pci_devsel_claim;
+wire pci_wait;
 
 pci pci
 (
@@ -777,11 +774,16 @@ pci pci
 	.avm_writedata(mem_writedata) ,					// input  [31:0] avm_writedata
 	.avm_byteenable(mem_byteenable) ,				// input  [3:0] avm_byteenable
 	.avm_burstcount(mem_burstcount) ,				// input  [2:0] avm_burstcount
-	.avm_write(pci_mem_cs & mem_write) ,			// input  avm_write
-	.avm_read(pci_mem_cs & mem_read) ,				// input  avm_read
+	.avm_write(mem_write) ,								// input  avm_write
+	.avm_read(mem_read) ,								// input  avm_read
 	.avm_waitrequest(pci_mem_waitrequest) ,		// output avm_waitrequest
 	.avm_readdatavalid(pci_mem_readdatavalid) ,	// output avm_readdatavalid
 	.avm_readdata(pci_mem_readdata) ,				// output [31:0] avm_readdata
+	
+	.pci_io_access(pci_io_access) ,					// output  pci_io_access
+	.pci_cs_claim(pci_cs_claim) ,						// output  pci_cs_claim
+	.pci_devsel_claim(pci_devsel_claim) ,			// output  pci_devsel_claim
+	.pci_wait(pci_wait) ,								// output  pci_wait
 	
 	.pci_irq_out(pci_irq_out) ,						// output pci_irq_out
 	
